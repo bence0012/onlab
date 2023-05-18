@@ -9,11 +9,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8875441261105280987}
-  - component: {fileID: 8875441262432465389}
-  - component: {fileID: 8875441262432465390}
-  - component: {fileID: 8875441262432465391}
-  - component: {fileID: 8875441262432465384}
-  - component: {fileID: 8875441262432465385}
   - component: {fileID: 8875441262432465393}
   m_Layer: 6
   m_Name: Room
@@ -37,71 +32,6 @@ Transform:
   m_Father: {fileID: 0}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!65 &8875441262432465389
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8875441261104983035}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!65 &8875441262432465390
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8875441261104983035}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!65 &8875441262432465391
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8875441261104983035}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!65 &8875441262432465384
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8875441261104983035}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
---- !u!65 &8875441262432465385
-BoxCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8875441261104983035}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Size: {x: 1, y: 1, z: 1}
-  m_Center: {x: 0, y: 0, z: 0}
 --- !u!114 &8875441262432465393
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -114,6 +44,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ade04cc229513f4fb255ae67aa02a3a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  tile: {fileID: 0}
   roomLength: {x: 1, y: 1}
   minLength: 3
   meshes:
@@ -123,9 +54,5 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 2237ef9c9ff4947158e0dfdd8809076b, type: 2}
   - {fileID: 2100000, guid: a1ecde157c64844cd91342234e9e354f, type: 2}
   groundDividers: {x: 1.92, y: 1.5}
-  wallColliders:
-  - {fileID: 8875441262432465389}
-  - {fileID: 8875441262432465385}
-  - {fileID: 8875441262432465384}
-  - {fileID: 8875441262432465391}
-  groundCollider: {fileID: 8875441262432465390}
+  physicMaterial: {fileID: 0}
+  doorPrefab: {fileID: 0}
