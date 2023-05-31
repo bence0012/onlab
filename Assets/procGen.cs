@@ -2,6 +2,9 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Transactions;
+using Unity.VisualScripting;
+using Unity.VisualScripting.Dependencies.Sqlite;
 using UnityEngine;
 using UnityEngine.UIElements;
 using static UnityEditor.Experimental.AssetDatabaseExperimental.AssetDatabaseCounters;
@@ -9,16 +12,21 @@ using static UnityEditor.Experimental.AssetDatabaseExperimental.AssetDatabaseCou
 
 public enum celltype
 {
-    unoccupied, north, east, south, west, occuoied
+    unoccupied, north, east, south, west, occupied
 }
+
 
 public class Cell
 {
-    public Vector3 pos=new Vector3();
-    public celltype kind=celltype.unoccupied;
+    public Vector3 pos = new Vector3();
+    public celltype kind = celltype.unoccupied;
     public GameObject obj;
+    public float rot = 90;
+    public List<Cell> neighbours = new List<Cell>();
+    public List<GameObject> objects = new List<GameObject>();
+    public bool visited = false;
+   
 
-    
 }
 
 public class Door
@@ -26,20 +34,18 @@ public class Door
     public int wallId;
     public bool generate;
     public int whichWall;
+    public int connectTo;
     public Vector3 pos;
     public Vector3 rot=new Vector3(1,1,1);
     public Vector3 scale;
     public GameObject obj;
-    
+    public bool occupied =false;
     
     
 }
 
 public class procGen : MonoBehaviour
 {
-
-
-    public GameObject tile;
 
     [Header("Room Size")]
     public Vector2 roomLength;
@@ -56,7 +62,6 @@ public class procGen : MonoBehaviour
     public List<Material> materials;
     public Vector2 groundDividers;
 
-
     public PhysicMaterial physicMaterial;
 
     [Header("Additional elements")]
@@ -64,43 +69,167 @@ public class procGen : MonoBehaviour
 
 
     Vector2 prevSize;
-
-
-    List<Door> doors;
-
+    List<Door> doors = new List<Door>();
     List<Matrix4x4> walls;
     List<Matrix4x4> grounds;
-
     List<BoxCollider> wallColliders;
     BoxCollider groundCollider;
 
-    // Start is called before the first frame update
+    [Header("Anywhere")]
+    public GameObject vase;
+    public GameObject chair1;
+    public GameObject chair2;
+    public GameObject table1;
+    public GameObject table2;
+    public GameObject drawer1;
+    public GameObject drawer2;
+
+    [Header("Near Walls")]
+    public GameObject emptyRack;
+    public GameObject boxRack;
+    public GameObject serverRack;
+
+    [Header("Number of Objects")]
+    public int oneByOneNumber=10;
+    public int fiveByFiveNumber=10;
+    public int wallObjectNumber=10;
+    int oneNum;
+    int fiveNum;
+    int wallNum;
+
+
+    List<GameObject> anyObjs;
+    List<GameObject> wallObjs;
+
+    Dictionary<GameObject, Action<Cell>> objFuncPair;
+
+   
     void Start()
     {
-        doors = new List<Door>();
+       
+        
+    }
+
+    public float GetRadius()
+    {
+        return (transform.position - new Vector3(roomLength.x / 2, roomLength.y / 2, transform.position.z)).magnitude;
+    }
+    public List<Vector3> GetPoints()
+    {
+        List<Vector3> points=new List<Vector3>();
+        points.Add(transform.position + new Vector3(roomLength.x / 2, transform.position.y, roomLength.y / 2 ));
+
+        points.Add(transform.position + new Vector3(-roomLength.x / 2, transform.position.y,  -roomLength.y / 2));
+        //Instantiate(vase).transform.position = points[0];
+        //Instantiate(vase).transform.position = points[1];
+
+        return points;
+    }
+    public void SetSeed(int seed)
+    {
+        UnityEngine.Random.InitState(seed);
+
+    }
+
+    public void DestroyAll()
+    {
+        foreach(Cell cell in cells)
+        {
+            if(cell.obj!=null)
+                Destroy(cell.obj);
+        }
+        foreach (Door door in doors)
+            if (door.generate)
+                Destroy(door.obj);
+    }
+
+    public void StartOutside()
+    {
+        numOfWallsX = Mathf.Max(1, (int)(roomLength.x / minLength));
+        numOfWallsY = Mathf.Max(1, (int)(roomLength.y / minLength));
         groundCollider = gameObject.AddComponent<BoxCollider>();
         groundCollider.material = physicMaterial;
+
 
         wallColliders = new List<BoxCollider>();
         for (int i = 0; i < 8; i++)
         {
             wallColliders.Add(gameObject.AddComponent<BoxCollider>());
             wallColliders[i].material = physicMaterial;
-
+            
         }
+        objFuncPair = new Dictionary<GameObject, Action<Cell>>();
+        anyObjs = new List<GameObject>();
+        anyObjs.Add(vase);
+        objFuncPair[vase] = OnebyOneObject;
+
+        anyObjs.Add(chair1);
+        objFuncPair[chair1] = OnebyOneObject;
+
+        anyObjs.Add(chair2);
+        objFuncPair[chair2] = OnebyOneObject;
+
+        anyObjs.Add(table1);
+        objFuncPair[table1] = FivebyFiveObject;
+
+        anyObjs.Add(table2);
+        objFuncPair[table2] = FivebyFiveObject;
+
+        anyObjs.Add(drawer1);
+        objFuncPair[drawer1] = OnebyOneObject;
+
+        anyObjs.Add(drawer2);
+        objFuncPair[drawer2] = OnebyOneObject;
 
 
+        wallObjs = new List<GameObject>();
+        wallObjs.Add(emptyRack);
+        objFuncPair[emptyRack] = WallObject2;
+
+        wallObjs.Add(boxRack);
+        objFuncPair[boxRack] = WallObject2;
+
+        wallObjs.Add(serverRack);
+        objFuncPair[serverRack] = WallObject1;
+
+        wallObjs.Add(vase);
+        
     }
+    public void Render()
+    {
+            GenerateWall();
+            RenderWalls();
+            GenerateGround();
+            RenderGrounds();
+        
+    }
+    public void Change()
+    {
+        
+        roomLength = new Vector2(UnityEngine.Random.Range(6, 20), UnityEngine.Random.Range(6, 20));
+        numOfWallsX = Mathf.Max(1, (int)(roomLength.x / minLength));
+        numOfWallsY = Mathf.Max(1, (int)(roomLength.y / minLength));
+        prevSize = new Vector2();
+        hasChanged();
+        change = true;
+        
+    }
+    public List<Door> GetDoors()
+    {
+        List<Door> actualDoors=new List<Door>();
+        foreach(Door door in doors)
+            if(door.generate)
+                actualDoors.Add(door);
+       
 
+        return actualDoors;
+    }
     // Update is called once per frame
+    bool change = false;
     void Update()
     {
-       
-        hasChanged();
 
-        RenderWalls();
-        GenerateGround();
-        RenderGrounds();
+
         
     }
 
@@ -110,8 +239,7 @@ public class procGen : MonoBehaviour
     {
         walls = new List<Matrix4x4>();
         
-        numOfWallsX = Mathf.Max(1, (int)(roomLength.x / minLength));
-        numOfWallsY = Mathf.Max(1, (int)(roomLength.y / minLength));
+        
         
         wallSize = meshes[0].bounds.size.x;
         scaleX=(roomLength.x/numOfWallsX)/wallSize;
@@ -233,7 +361,7 @@ public class procGen : MonoBehaviour
 
     void CalculateColliders()
     {
-
+        
         PutCollider(wallColliders[0],new Vector3(roomLength.x / 2 + 0.05f, 0, (doors[3].wallId + 1)*roomLength.y/numOfWallsY/2), new Vector3(meshes[0].bounds.size.z, meshes[0].bounds.size.y, roomLength.y / numOfWallsY * (numOfWallsY - doors[3].wallId-1)));
         PutCollider(wallColliders[1],new Vector3(roomLength.x / 2 + 0.05f, 0, (numOfWallsY- doors[3].wallId)*-roomLength.y/numOfWallsY/2), new Vector3(meshes[0].bounds.size.z, meshes[0].bounds.size.y, roomLength.y / numOfWallsY * (doors[3].wallId)));
         PutCollider(wallColliders[2], new Vector3(-roomLength.x / 2 - 0.05f, 0, (doors[2].wallId + 1) * roomLength.y / numOfWallsY / 2), new Vector3(meshes[0].bounds.size.z, meshes[0].bounds.size.y, roomLength.y / numOfWallsY * (numOfWallsY - doors[2].wallId - 1)));
@@ -267,7 +395,9 @@ public class procGen : MonoBehaviour
     {
         if (prevSize != roomLength)
         {
-            
+            oneNum = oneByOneNumber;
+            fiveNum = fiveByFiveNumber;
+            wallNum = wallObjectNumber;
 
 
 
@@ -284,17 +414,29 @@ public class procGen : MonoBehaviour
             {
                 Door door = new Door();
                 door.whichWall = i;
+                switch (i)
+                {
+                    case 0: door.connectTo = 1; break;
+                    case 1: door.connectTo = 0; break;
+                    case 2: door.connectTo = 3; break;
+                    case 3: door.connectTo = 2; break;
+
+                }
                 door.wallId = 0;
                 door.pos = new Vector3();
                 door.generate = RandomBool();
-
-                doors.Add(door);
-                if (door.whichWall < 1)
-                    door.wallId = UnityEngine.Random.Range(0, numOfWallsX);
-                else
-                    door.wallId = UnityEngine.Random.Range(0, numOfWallsY);
                 if (!door.generate)
                     door.wallId = -1;
+                else
+                {
+                    if (door.whichWall < 2)
+                        door.wallId = UnityEngine.Random.Range(0, numOfWallsX);
+                    else
+                        door.wallId = UnityEngine.Random.Range(0, numOfWallsY);
+                }
+
+            
+            doors.Add(door);
             }
 
 
@@ -302,22 +444,28 @@ public class procGen : MonoBehaviour
             GenerateDoors();
             CalculateColliders();
             GenerateTiles();
+            foreach(Cell cell in cells)
+                FillCell(cell);
             
 
             prevSize =roomLength;
         }
+    
     }
 
     void GenerateDoors()
     {
         foreach (Door i in doors)
         {
-            i.obj = GameObject.Instantiate(doorPrefab);
-            i.obj.GetComponent<Transform>().position = i.pos;
-            Quaternion rot= new Quaternion(0, 0, 0, 1);
-            rot.SetLookRotation(i.rot);
-            i.obj.GetComponent<Transform>().rotation=rot;
-            i.obj.GetComponent<Transform>().localScale = i.scale;
+            
+                i.obj = GameObject.Instantiate(doorPrefab);
+                i.obj.GetComponent<Transform>().position = i.pos;
+                i.obj.transform.parent = this.transform;
+                Quaternion rot = new Quaternion(0, 0, 0, 1);
+                rot.SetLookRotation(i.rot);
+                i.obj.GetComponent<Transform>().rotation = rot;
+                i.obj.GetComponent<Transform>().localScale = i.scale;
+            
         }
     }
 
@@ -337,26 +485,273 @@ public class procGen : MonoBehaviour
             {
                 cells[i,j] = new Cell();
                 cells[i,j].pos = transform.position + new Vector3(roomLength.x / 2 - 0.5f - (i * 1), -meshes[0].bounds.size.y / 2 - 0.01f, roomLength.y / 2 - 0.5f-(j*1));
+                
                 if (j == countY - 1)
-                    cells[i, j].kind = celltype.north;
-                else if (j == 0)
-                    cells[i, j].kind = celltype.south;
-                else if (i == countX - 1)
-                    cells[i, j].kind = celltype.east;
-                else if (i == 0)
-                    cells[i, j].kind = celltype.west;
-
-                if (UnityEngine.Random.value>0.5f)
                 {
-                    cells[i, j].obj = Instantiate(tile);
-                    cells[i, j].obj.GetComponent<Transform>().position=cells[i, j].pos;
+                    if (i == countX - 1 || i == 0)
+                    {
+                        cells[i, j].kind = celltype.occupied;
+                        continue;
+                    }
+                    cells[i, j].kind = celltype.north;
+                    cells[i, j].objects = new List<GameObject>(wallObjs);
+                    cells[i, j].rot = 90;
+                }
+                else if (j == 0)
+                {
+                    if (i == countX - 1 || i == 0)
+                    {
+                        cells[i, j].kind = celltype.occupied;
+                        continue;
+                    }
+                    cells[i, j].kind = celltype.south;
+                    cells[i, j].objects = new List<GameObject>(wallObjs);
+                    cells[i, j].rot = -90;
+
+                }
+                else if (i == countX - 1)
+                {
+                   
+                    cells[i, j].kind = celltype.east;
+                    cells[i, j].objects = new List<GameObject>(wallObjs);
+                    cells[i, j].rot = 180;
+
+
+                }
+                else if (i == 0)
+                {
                     
+                    cells[i, j].kind = celltype.west;
+                    cells[i, j].objects = new List<GameObject>(wallObjs);
+                    cells[i, j].rot = 0;
+
+                }
+                else
+                    cells[i, j].objects = new List<GameObject>(anyObjs);
+
+                for (int k = 0; k < 4; k++)
+                {
+                    if ((cells[i, j].pos - doors[k].obj.transform.position).magnitude < 3.5f)
+                    {
+                        cells[i, j].kind = celltype.occupied;
+                      
+                    }
                 }
 
             }
         }
-
+        MakeGraph();
     }
 
 
+    void MakeGraph()
+    {
+        for (int x = 0; x < countX; x++)
+        {
+            for (int y = 0; y < countY; y++)
+            {
+                for (int i = -1; i < 2; i++)
+                {
+                    for (int j = -1; j < 2; j++)
+                    {
+                        int neigX = x + j;
+                        int neigY = y + i;
+
+                        if (neigX < 0 || neigX >= countX || neigY < 0 || neigY >= countY ||(j==0 && i==0))
+                        {
+                            continue;
+                        }
+                        cells[x, y].neighbours.Add(cells[x + j, y + i]);
+                    }
+                }
+            }
+        }
+    }
+
+    public int noObj = 100;
+    void FillCell(Cell fill)
+    {
+        switch (fill.kind)
+        {
+            case celltype.occupied:
+                return;
+            case celltype.unoccupied:
+                int num=UnityEngine.Random.Range(0, fill.objects.Count+noObj);
+            
+                if (num >= fill.objects.Count)
+                {
+                    
+                    fill.kind = celltype.occupied;
+                    break;
+                }
+                else
+                {
+                    
+                    
+                    fill.obj=fill.objects[num];
+
+                    objFuncPair[fill.objects[num]](fill);
+                    fill.kind=celltype.occupied;
+                    
+                }
+                break;
+            default:
+                int num2 = UnityEngine.Random.Range(0, fill.objects.Count + noObj);
+
+                if (num2 >= fill.objects.Count)
+                {
+                    
+
+                    fill.kind = celltype.occupied;
+                    break;
+                }
+                else
+                {
+
+                    
+
+                    fill.obj=fill.objects[num2];
+                    
+                    objFuncPair[fill.objects[num2]](fill);
+                    fill.kind = celltype.occupied;
+
+                }
+                break;
+                
+        }
+
+
+    }
+
+    void occupyCells(Cell cell, int depth)
+    {
+        
+        if (depth == 0 || cell.kind==celltype.occupied)
+            return;
+        cell.kind = celltype.occupied;
+        foreach(Cell neighbour in cell.neighbours)
+        {
+            occupyCells(neighbour, depth-1  );
+        }
+
+    }
+    int counter = 0;
+    int counter2 = 0;
+    void RemovePossibleObjects(Cell cell, List<GameObject> objects, int depth)
+    {
+        if (cell.visited)
+            return;
+        if (depth == 0) { 
+            foreach (GameObject obj in objects)
+                cell.objects.Remove(obj);
+            cell.visited = false;
+            return; 
+        }
+        
+        cell.visited=true;
+        foreach(Cell neighbour in cell.neighbours)
+            RemovePossibleObjects(neighbour, objects, depth-1);
+        cell.visited = false;
+
+    }
+
+    void OnebyOneObject(Cell cell)
+    {
+        if (oneNum == 0)
+        {
+            cell.obj = null;
+            return;
+        }
+        cell.obj = Instantiate(cell.obj);
+        cell.obj.GetComponent<Transform>().position = cell.pos + new Vector3(0, 0.05f, 0);
+        cell.obj.transform.parent = this.transform;
+        cell.rot *= UnityEngine.Random.Range(0, 4);
+
+        cell.obj.transform.rotation = Quaternion.Euler(0, cell.rot,0);
+        occupyCells(cell, 1);
+        List<GameObject> objects = new List<GameObject>();
+        objects.Add(table1);
+        objects.Add(table2);
+        objects.Add(emptyRack);
+        objects.Add(boxRack);
+        objects.Add(serverRack);
+        RemovePossibleObjects(cell, objects, 1);
+        oneNum--;
+    }
+    void WallObject1(Cell cell)
+    {
+        if (wallNum == 0)
+        {
+            cell.obj = null;
+            return;
+        }
+        cell.obj = Instantiate(cell.obj);
+        cell.obj.GetComponent<Transform>().position = cell.pos + new Vector3(0, 0.05f, 0);
+        cell.obj.transform.parent = this.transform;
+
+        cell.obj.transform.rotation = Quaternion.Euler(0, cell.rot, 0);
+
+
+        occupyCells(cell, 2);
+        List<GameObject> objects = new List<GameObject>();
+        objects.Add(table1);
+        objects.Add(table2);
+        
+        RemovePossibleObjects(cell, objects, 3);
+        objects.Clear();
+        objects.Add(emptyRack);
+        objects.Add(boxRack);
+        RemovePossibleObjects(cell, objects, 2);
+        objects.Clear();
+        objects.Add(serverRack);
+        RemovePossibleObjects(cell, objects, 1);
+
+        wallNum--;
+    }
+    void WallObject2(Cell cell)
+    {
+        if (wallNum == 0)
+        {
+            cell.obj = null;
+            return;
+        }
+        cell.obj = Instantiate(cell.obj);
+        cell.obj.GetComponent<Transform>().position = cell.pos + new Vector3(0, 0.05f, 0);
+        cell.obj.transform.parent = this.transform;
+
+        cell.obj.transform.rotation = Quaternion.Euler(0, cell.rot, 0);
+
+
+        occupyCells(cell, 2);
+        List<GameObject> objects = new List<GameObject>();
+        objects.Add(table1);
+        objects.Add(table2);
+
+        RemovePossibleObjects(cell, objects, 3);
+        objects.Clear();
+        objects.Add(emptyRack);
+        objects.Add(boxRack);
+        objects.Add(serverRack);
+        RemovePossibleObjects(cell, objects, 2);
+        wallNum--;
+    }
+    void FivebyFiveObject(Cell cell)
+    {
+        if (fiveNum == 0)
+        {
+            cell.obj = null;
+            return;
+        }
+        cell.obj = Instantiate(cell.obj);
+        cell.obj.GetComponent<Transform>().position = cell.pos + new Vector3(0, 0.05f, 0);
+        cell.obj.transform.parent = this.transform;
+
+        cell.rot *= UnityEngine.Random.Range(0, 4);
+
+        cell.obj.transform.rotation = Quaternion.Euler(0, cell.rot, 0);
+
+        occupyCells(cell, 5);
+        fiveNum--;
+        
+    }
 }
