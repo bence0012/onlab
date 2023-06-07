@@ -84,7 +84,7 @@ public class movement : MonoBehaviour
         moveDirection = orient.forward * verticalInput + orient.right * horizontalInput;
 
         
-        if (new Vector2(rb.velocity.x, rb.velocity.z).magnitude < 0.1)
+        if (new Vector2(rb.velocity.x, rb.velocity.z).magnitude < 2f)
             animator.SetBool("isMoving", false);
         else
             animator.SetBool("isMoving", true);

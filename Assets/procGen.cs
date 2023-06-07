@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Transactions;
 using Unity.VisualScripting;
 using Unity.VisualScripting.Dependencies.Sqlite;
+using Unity.VisualScripting.FullSerializer;
 using UnityEngine;
 using UnityEngine.UIElements;
 using static UnityEditor.Experimental.AssetDatabaseExperimental.AssetDatabaseCounters;
@@ -41,12 +42,25 @@ public class Door
     public GameObject obj;
     public bool occupied =false;
     
+    public void Close()
+    {
+        
+        if (!occupied)
+        {
+            MonoBehaviour.Destroy(obj);
+            generate = false;
+        }
+    }
+
+
     
 }
 
 public class procGen : MonoBehaviour
 {
 
+    public bool enabled=false;
+    bool started = false;
     [Header("Room Size")]
     public Vector2 roomLength;
     public float minLength=0.7f;
@@ -71,7 +85,9 @@ public class procGen : MonoBehaviour
     Vector2 prevSize;
     List<Door> doors = new List<Door>();
     List<Matrix4x4> walls;
+    List<Matrix4x4> topWalls;
     List<Matrix4x4> grounds;
+    List<Matrix4x4> ceilings;
     List<BoxCollider> wallColliders;
     BoxCollider groundCollider;
 
@@ -96,7 +112,7 @@ public class procGen : MonoBehaviour
     int oneNum;
     int fiveNum;
     int wallNum;
-
+    
 
     List<GameObject> anyObjs;
     List<GameObject> wallObjs;
@@ -106,7 +122,7 @@ public class procGen : MonoBehaviour
    
     void Start()
     {
-       
+        
         
     }
 
@@ -120,8 +136,9 @@ public class procGen : MonoBehaviour
         points.Add(transform.position + new Vector3(roomLength.x / 2, transform.position.y, roomLength.y / 2 ));
 
         points.Add(transform.position + new Vector3(-roomLength.x / 2, transform.position.y,  -roomLength.y / 2));
-        //Instantiate(vase).transform.position = points[0];
-        //Instantiate(vase).transform.position = points[1];
+        points.Add(transform.position + new Vector3(roomLength.x / 2, transform.position.y, -roomLength.y / 2));
+
+        points.Add(transform.position + new Vector3(-roomLength.x / 2, transform.position.y, roomLength.y / 2));
 
         return points;
     }
@@ -197,11 +214,15 @@ public class procGen : MonoBehaviour
     }
     public void Render()
     {
-            GenerateWall();
             RenderWalls();
-            GenerateGround();
             RenderGrounds();
         
+    }
+    public void ReGenerate()
+    {
+        GenerateWall();
+        GenerateGround();
+
     }
     public void Change()
     {
@@ -228,8 +249,19 @@ public class procGen : MonoBehaviour
     bool change = false;
     void Update()
     {
-
-
+        if(enabled && !started)
+        {
+            StartOutside();
+            hasChanged();
+            ReGenerate();
+            started = true;
+        }
+        if (enabled)
+        {
+            hasChanged();
+            Render();
+               
+        }
         
     }
 
@@ -238,7 +270,7 @@ public class procGen : MonoBehaviour
     void GenerateWall()
     {
         walls = new List<Matrix4x4>();
-        
+        topWalls = new List<Matrix4x4>();
         
         
         wallSize = meshes[0].bounds.size.x;
@@ -251,7 +283,7 @@ public class procGen : MonoBehaviour
         {
             if (i == doors[0].wallId && doors[0].generate)
             {
-                doors[0].pos = transform.position + new Vector3(-roomLength.x / 2 + wallSize * scaleX / 2 + i * scaleX * wallSize, 0, roomLength.y / 2 + 1.8f);
+                doors[0].pos = transform.position + new Vector3(-roomLength.x / 2 + wallSize * scaleX / 2 + i * scaleX * wallSize, -0.1f, roomLength.y / 2 + 1.8f);
                 doors[0].rot = new Vector3(0, 0, 1);
                 doors[0].scale=new Vector3(scaleX*1.01f, 1, 1);
                 continue;
@@ -261,13 +293,22 @@ public class procGen : MonoBehaviour
             var s = new Vector3(scaleX, 1,1);
 
             var mat = Matrix4x4.TRS(t, r, s);
+
+
             walls.Add(mat);
+            t.y += 1.324f;
+            t.z -= 0.045f;
+            r = Quaternion.LookRotation(new Vector3(-1, 0, 0));
+
+            mat = Matrix4x4.TRS(t, r, new Vector3(1,1,scaleX));
+            topWalls.Add(mat);
+
         }
         for (int i = 0; i < numOfWallsX; i++)
         {
             if (i == doors[1].wallId && doors[1].generate)
             {
-                doors[1].pos = transform.position + new Vector3(-roomLength.x / 2 + wallSize * scaleX / 2 + i * scaleX * wallSize, 0, -roomLength.y / 2-1.8f);
+                doors[1].pos = transform.position + new Vector3(-roomLength.x / 2 + wallSize * scaleX / 2 + i * scaleX * wallSize, -0.1f, -roomLength.y / 2-1.8f);
                 doors[1].rot = new Vector3(0, 0, -1);
                 doors[1].scale = new Vector3(scaleX * 1.01f, 1, 1);
 
@@ -280,12 +321,18 @@ public class procGen : MonoBehaviour
 
             var mat = Matrix4x4.TRS(t, r, s);
             walls.Add(mat);
+            t.y += 1.324f;
+            t.z += 0.045f;
+            r = Quaternion.LookRotation(new Vector3(1, 0, 0));
+
+            mat = Matrix4x4.TRS(t, r, new Vector3(1,1, scaleX));
+            topWalls.Add(mat);
         }
         for (int i = 0; i < numOfWallsY; i++)
         {
             if (i == doors[2].wallId && doors[2].generate)
             {
-                doors[2].pos = transform.position + new Vector3(-roomLength.x / 2 - 1.8f, 0, -roomLength.y / 2 + wallSize * scaleY / 2 + i * scaleY * wallSize);
+                doors[2].pos = transform.position + new Vector3(-roomLength.x / 2 - 1.8f, -0.1f, -roomLength.y / 2 + wallSize * scaleY / 2 + i * scaleY * wallSize);
                 doors[2].rot = new Vector3(-1, 0, 0);
                 doors[2].scale = new Vector3(scaleY*1.01f, 1, 1);
 
@@ -298,13 +345,19 @@ public class procGen : MonoBehaviour
 
             var mat = Matrix4x4.TRS(t, r, s);
             walls.Add(mat);
-            
+            t.y += 1.324f;
+            t.x += 0.045f;
+            r = Quaternion.LookRotation(new Vector3(0, 0, -1));
+
+            mat = Matrix4x4.TRS(t, r, new Vector3(1, 1,scaleY));
+            topWalls.Add(mat);
+
         }
         for (int i = 0; i < numOfWallsY; i++)
         {
             if (i == doors[3].wallId && doors[3].generate)
             {
-                doors[3].pos = transform.position + new Vector3(roomLength.x / 2 + 1.8f, 0, -roomLength.y / 2 + wallSize * scaleY / 2 + i * scaleY * wallSize);
+                doors[3].pos = transform.position + new Vector3(roomLength.x / 2 + 1.8f, -0.1f, -roomLength.y / 2 + wallSize * scaleY / 2 + i * scaleY * wallSize);
                 doors[3].rot = new Vector3(1, 0, 0);
                 doors[3].scale = new Vector3(scaleY*1.01f, 1, 1);
 
@@ -315,9 +368,15 @@ public class procGen : MonoBehaviour
             var r = transform.rotation;
             r.SetLookRotation(new Vector3(1, 0, 0));
             var s = new Vector3(scaleY, 1, 1);
-
             var mat = Matrix4x4.TRS(t, r, s);
+
+
             walls.Add(mat);
+            t.y += 1.324f;
+            t.x -= 0.045f;
+            r =Quaternion.LookRotation(new Vector3(0, 0, 1));
+            mat = Matrix4x4.TRS(t, r, new Vector3(1,1, scaleY));
+            topWalls.Add(mat);
         }
         
     }
@@ -329,13 +388,14 @@ public class procGen : MonoBehaviour
         if (walls != null)
         {
             Graphics.DrawMeshInstanced(meshes[0], 0, materials[0], walls.ToArray(), walls.Count);
+            Graphics.DrawMeshInstanced(meshes[2], 0, materials[2], topWalls.ToArray(), walls.Count);
         }
     }
 
     void GenerateGround()
     {
         grounds = new List<Matrix4x4>();
-
+        ceilings = new List<Matrix4x4>();
 
         for (int i = 0; i < numOfWallsX; i++)
         {
@@ -347,6 +407,9 @@ public class procGen : MonoBehaviour
 
                 var mat = Matrix4x4.TRS(t, r, s);
                 grounds.Add(mat);
+                t.y += 2.55f;
+                mat= Matrix4x4.TRS(t, r, s);
+                ceilings.Add(mat);
             }
         }
     }
@@ -356,6 +419,7 @@ public class procGen : MonoBehaviour
         if (grounds != null)
         {
             Graphics.DrawMeshInstanced(meshes[1], 0, materials[1], grounds.ToArray(), grounds.Count);
+            //Graphics.DrawMeshInstanced(meshes[3], 0, materials[3], ceilings.ToArray(), grounds.Count);
         }
     }
 
@@ -378,7 +442,8 @@ public class procGen : MonoBehaviour
 
     void PutCollider(BoxCollider wallCollider, Vector3 center, Vector3 size)
     {
-        
+        if (size.x < 0 || size.z < 0)
+            size = new Vector3();
         wallCollider.center = center;
         wallCollider.size = size;
     }
@@ -444,6 +509,8 @@ public class procGen : MonoBehaviour
             GenerateDoors();
             CalculateColliders();
             GenerateTiles();
+            ReGenerate();
+
             foreach(Cell cell in cells)
                 FillCell(cell);
             

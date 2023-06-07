@@ -10,6 +10,7 @@ public class MakeMap : MonoBehaviour
     // Start is called before the first frame update
 
     public int seed = 100;
+    public int roomNum = 7;
     int prevSeed = 0;
     List<Door> doors = new List<Door>();
     List<GameObject> rooms=new List<GameObject> ();
@@ -30,7 +31,7 @@ public class MakeMap : MonoBehaviour
             //procgen.Change();
     }
 
-    int roomnum = 20;
+    
     int trynum = 100;
     void haschanged()
     {
@@ -48,7 +49,6 @@ public class MakeMap : MonoBehaviour
             procgen.Clear();
             rooms.Clear();
             doors.Clear();
-            //room.transform.position = new Vector3(10,10,10);
             rooms.Add(Instantiate(room));
             procgen.Add(rooms[0].GetComponent<procGen>());
             UnityEngine.Random.InitState(seed);
@@ -57,7 +57,6 @@ public class MakeMap : MonoBehaviour
             procgen[0].Change();
             while (procgen[0].GetDoors().Count < 2)
             {
-               // print(procgen[0].GetDoors().Count);
                 procgen[0].Change();
 
 
@@ -66,7 +65,7 @@ public class MakeMap : MonoBehaviour
             int i = 1;
             while (doors[i-1]!=null)
             {
-                if (i == roomnum)
+                if (i == roomNum)
                     break;
                 rooms.Add(Instantiate(room));
                 procgen.Add(rooms[i].GetComponent<procGen>());
@@ -88,7 +87,7 @@ public class MakeMap : MonoBehaviour
                             
                             if (door.whichWall == originDoor.connectTo && !originDoor.occupied)
                             {
-                                rooms[i].transform.position = originDoor.obj.transform.position - door.obj.transform.position;
+                                rooms[i].transform.position = originDoor.obj.transform.position - door.obj.transform.localPosition;
                                 badGen = false;
                                 foreach(GameObject room in rooms)
                                 {
@@ -97,21 +96,23 @@ public class MakeMap : MonoBehaviour
                                     List<Vector3> r = procgen[i].GetPoints();
 
 
+                                    
 
 
-
-                                    badGen = l[0].x > r[0].x && l[1].x < r[0].x && l[0].z > r[0].z && l[1].z < r[0].z && l[1].x < r[0].x && l[0].x > r[0].x && l[1].z < r[0].z && l[0].z > r[0].z || l[0].x > r[1].x && l[1].x < r[1].x && l[0].z > r[1].z && l[1].z < r[1].z && l[1].x < r[1].x && l[0].x > r[1].x && l[1].z < r[1].z && l[0].z > r[1].z;
+                                    badGen = l[0].x > r[0].x && l[1].x < r[0].x && l[0].z > r[0].z && l[1].z < r[0].z && l[1].x < r[0].x && l[0].x > r[0].x && l[1].z < r[0].z && l[0].z > r[0].z || l[0].x > r[1].x && l[1].x < r[1].x && l[0].z > r[1].z && l[1].z < r[1].z && l[1].x < r[1].x && l[0].x > r[1].x && l[1].z < r[1].z && l[0].z > r[1].z||l[0].x > r[0].x && l[1].x < r[0].x && l[0].z > r[0].z && l[1].z < r[0].z && l[1].x < r[0].x && l[0].x > r[0].x && l[1].z < r[0].z && l[0].z > r[0].z || l[0].x > r[1].x && l[1].x < r[1].x && l[0].z > r[1].z && l[1].z < r[1].z && l[1].x < r[1].x && l[0].x > r[1].x && l[1].z < r[1].z && l[0].z > r[1].z ||l[0].x > r[2].x && l[1].x < r[2].x && l[0].z > r[2].z && l[1].z < r[2].z && l[1].x < r[2].x && l[0].x > r[2].x && l[1].z < r[2].z && l[0].z > r[2].z || l[0].x > r[3].x && l[1].x < r[3].x && l[0].z > r[3].z && l[1].z < r[3].z && l[1].x < r[3].x && l[0].x > r[3].x && l[1].z < r[3].z && l[0].z > r[3].z|| r[0].x > l[0].x && r[1].x < l[0].x && r[0].z > l[0].z && r[1].z < l[0].z && r[1].x < l[0].x && r[0].x > l[0].x && r[1].z < l[0].z && r[0].z > l[0].z || r[0].x > l[1].x && r[1].x < l[1].x && r[0].z > l[1].z && r[1].z < l[1].z && r[1].x < l[1].x && r[0].x > l[1].x && r[1].z < l[1].z && r[0].z > l[1].z || r[0].x > l[0].x && r[1].x < l[0].x && r[0].z > l[0].z && r[1].z < l[0].z && r[1].x < l[0].x && r[0].x > l[0].x && r[1].z < l[0].z && r[0].z > l[0].z || r[0].x > l[1].x && r[1].x < l[1].x && r[0].z > l[1].z && r[1].z < l[1].z && r[1].x < l[1].x && r[0].x > l[1].x && r[1].z < l[1].z && r[0].z > l[1].z || r[0].x > l[2].x && r[1].x < l[2].x && r[0].z > l[2].z && r[1].z < l[2].z && r[1].x < l[2].x && r[0].x > l[2].x && r[1].z < l[2].z && r[0].z > l[2].z || r[0].x > l[3].x && r[1].x < l[3].x && r[0].z > l[3].z && r[1].z < l[3].z && r[1].x < l[3].x && r[0].x > l[3].x && r[1].z < l[3].z && r[0].z > l[3].z;
                                     if(badGen)
                                         break;
                                 }
                                 if (badGen) continue;
-
-
-                                print("found");
                                 
                                 found = true;
                                 door.occupied = true;
+                                if (originDoor.obj.transform.localScale.x > door.obj.transform.localScale.x)
+                                    Destroy(door.obj);
+                                else
+                                    Destroy(originDoor.obj);
                                 originDoor.occupied = true;
+
                                 break;
                             }
 
@@ -121,7 +122,6 @@ public class MakeMap : MonoBehaviour
                             break;
                     }
                     j++;
-                    print(j);
                     if (j == trynum)
                         break;
                 }
@@ -138,9 +138,13 @@ public class MakeMap : MonoBehaviour
                 if(found)
                     doors.AddRange(procgen[i].GetDoors());
                 i++;
-                print(i);
             }
-
+            foreach(Door door in doors)
+            {
+                door.Close();
+            }
+            foreach (procGen gen in procgen)
+                gen.ReGenerate();
         }
 
     }
