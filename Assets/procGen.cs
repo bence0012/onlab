@@ -1,21 +1,11 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Transactions;
-using Unity.VisualScripting;
-using Unity.VisualScripting.Dependencies.Sqlite;
-using Unity.VisualScripting.FullSerializer;
 using UnityEngine;
-using UnityEngine.UIElements;
-using static UnityEditor.Experimental.AssetDatabaseExperimental.AssetDatabaseCounters;
-
 
 public enum celltype
 {
     unoccupied, north, east, south, west, occupied
 }
-
 
 public class Cell
 {
@@ -25,13 +15,14 @@ public class Cell
     public float rot = 90;
     public List<Cell> neighbours = new List<Cell>();
     public List<GameObject> objects = new List<GameObject>();
+    public Door nearDoor = null;
     public bool visited = false;
-   
-
+    public int value=-1;
 }
 
 public class Door
 {
+    public bool win = false;
     public int wallId;
     public bool generate;
     public int whichWall;
@@ -41,14 +32,18 @@ public class Door
     public Vector3 scale;
     public GameObject obj;
     public bool occupied =false;
+    public List<Cell> nearCell = new List<Cell>();
+    public Door other;
+    public procGen procGen;
     
-    public void Close()
+    public void Close(bool gen)
     {
-        
-        if (!occupied)
-        {
-            MonoBehaviour.Destroy(obj);
-            generate = false;
+        if (obj !=null) { 
+            if (!occupied || (!win && !generate))
+            {
+                MonoBehaviour.Destroy(obj);
+                generate = gen;
+            }
         }
     }
 
@@ -120,10 +115,14 @@ public class procGen : MonoBehaviour
     Dictionary<GameObject, Action<Cell>> objFuncPair;
 
    
-    void Start()
+    public Cell GetCell()
     {
-        
-        
+        foreach(Cell cell in cells)
+        {
+            if(cell.obj==null)
+                return cell;   
+        }
+        return null;
     }
 
     public float GetRadius()
@@ -224,6 +223,8 @@ public class procGen : MonoBehaviour
         GenerateGround();
 
     }
+    bool change = false;
+
     public void Change()
     {
         
@@ -246,7 +247,6 @@ public class procGen : MonoBehaviour
         return actualDoors;
     }
     // Update is called once per frame
-    bool change = false;
     void Update()
     {
         if(enabled && !started)
@@ -262,7 +262,10 @@ public class procGen : MonoBehaviour
             Render();
                
         }
+        foreach (Door door in doors)
+            door.Close(false);
         
+
     }
 
     
@@ -283,7 +286,7 @@ public class procGen : MonoBehaviour
         {
             if (i == doors[0].wallId && doors[0].generate)
             {
-                doors[0].pos = transform.position + new Vector3(-roomLength.x / 2 + wallSize * scaleX / 2 + i * scaleX * wallSize, -0.1f, roomLength.y / 2 + 1.8f);
+                doors[0].pos = transform.position + new Vector3(-roomLength.x / 2 + wallSize * scaleX / 2 + i * scaleX * wallSize, -0.04f, roomLength.y / 2 + 1.8f);
                 doors[0].rot = new Vector3(0, 0, 1);
                 doors[0].scale=new Vector3(scaleX*1.01f, 1, 1);
                 continue;
@@ -308,7 +311,7 @@ public class procGen : MonoBehaviour
         {
             if (i == doors[1].wallId && doors[1].generate)
             {
-                doors[1].pos = transform.position + new Vector3(-roomLength.x / 2 + wallSize * scaleX / 2 + i * scaleX * wallSize, -0.1f, -roomLength.y / 2-1.8f);
+                doors[1].pos = transform.position + new Vector3(-roomLength.x / 2 + wallSize * scaleX / 2 + i * scaleX * wallSize, -0.04f, -roomLength.y / 2-1.8f);
                 doors[1].rot = new Vector3(0, 0, -1);
                 doors[1].scale = new Vector3(scaleX * 1.01f, 1, 1);
 
@@ -332,7 +335,7 @@ public class procGen : MonoBehaviour
         {
             if (i == doors[2].wallId && doors[2].generate)
             {
-                doors[2].pos = transform.position + new Vector3(-roomLength.x / 2 - 1.8f, -0.1f, -roomLength.y / 2 + wallSize * scaleY / 2 + i * scaleY * wallSize);
+                doors[2].pos = transform.position + new Vector3(-roomLength.x / 2 - 1.8f, -0.04f, -roomLength.y / 2 + wallSize * scaleY / 2 + i * scaleY * wallSize);
                 doors[2].rot = new Vector3(-1, 0, 0);
                 doors[2].scale = new Vector3(scaleY*1.01f, 1, 1);
 
@@ -357,7 +360,7 @@ public class procGen : MonoBehaviour
         {
             if (i == doors[3].wallId && doors[3].generate)
             {
-                doors[3].pos = transform.position + new Vector3(roomLength.x / 2 + 1.8f, -0.1f, -roomLength.y / 2 + wallSize * scaleY / 2 + i * scaleY * wallSize);
+                doors[3].pos = transform.position + new Vector3(roomLength.x / 2 + 1.8f, -0.04f, -roomLength.y / 2 + wallSize * scaleY / 2 + i * scaleY * wallSize);
                 doors[3].rot = new Vector3(1, 0, 0);
                 doors[3].scale = new Vector3(scaleY*1.01f, 1, 1);
 
@@ -513,11 +516,21 @@ public class procGen : MonoBehaviour
 
             foreach(Cell cell in cells)
                 FillCell(cell);
-            
+
+           // foreach (Cell cell in cells)
+           //     cell.pos = cell.pos + transform.position;
+
+
 
             prevSize =roomLength;
         }
     
+    }
+
+    public void CalcCellPos()
+    {
+        foreach (Cell cell in cells)
+            cell.pos = cell.pos + transform.position;
     }
 
     void GenerateDoors()
@@ -525,13 +538,14 @@ public class procGen : MonoBehaviour
         foreach (Door i in doors)
         {
             
-                i.obj = GameObject.Instantiate(doorPrefab);
-                i.obj.GetComponent<Transform>().position = i.pos;
-                i.obj.transform.parent = this.transform;
-                Quaternion rot = new Quaternion(0, 0, 0, 1);
-                rot.SetLookRotation(i.rot);
-                i.obj.GetComponent<Transform>().rotation = rot;
-                i.obj.GetComponent<Transform>().localScale = i.scale;
+            i.obj = GameObject.Instantiate(doorPrefab);
+            i.obj.GetComponent<Transform>().position = i.pos;
+            i.obj.transform.parent = this.transform;
+            Quaternion rot = new Quaternion(0, 0, 0, 1);
+            rot.SetLookRotation(i.rot);
+            i.obj.GetComponent<Transform>().rotation = rot;
+            i.obj.GetComponent<Transform>().localScale = i.scale;
+            i.procGen = this;
             
         }
     }
@@ -598,10 +612,11 @@ public class procGen : MonoBehaviour
 
                 for (int k = 0; k < 4; k++)
                 {
-                    if ((cells[i, j].pos - doors[k].obj.transform.position).magnitude < 3.5f)
+                    if ((cells[i, j].pos - doors[k].obj.transform.position).magnitude < 3f)
                     {
                         cells[i, j].kind = celltype.occupied;
-                      
+                        cells[i, j].nearDoor = doors[k];
+                        doors[k].nearCell.Add(cells[i, j]);
                     }
                 }
 
@@ -648,7 +663,7 @@ public class procGen : MonoBehaviour
                 if (num >= fill.objects.Count)
                 {
                     
-                    fill.kind = celltype.occupied;
+                    fill.kind = celltype.unoccupied;
                     break;
                 }
                 else
@@ -669,7 +684,7 @@ public class procGen : MonoBehaviour
                 {
                     
 
-                    fill.kind = celltype.occupied;
+                    fill.kind = celltype.unoccupied;
                     break;
                 }
                 else
@@ -681,6 +696,8 @@ public class procGen : MonoBehaviour
                     
                     objFuncPair[fill.objects[num2]](fill);
                     fill.kind = celltype.occupied;
+                   // foreach(var obj in fill.neighbours)
+                       // obj.neighbours.Remove(fill);
 
                 }
                 break;
@@ -699,11 +716,11 @@ public class procGen : MonoBehaviour
         foreach(Cell neighbour in cell.neighbours)
         {
             occupyCells(neighbour, depth-1  );
+            //neighbour.neighbours.Remove(cell);
         }
 
     }
-    int counter = 0;
-    int counter2 = 0;
+
     void RemovePossibleObjects(Cell cell, List<GameObject> objects, int depth)
     {
         if (cell.visited)
@@ -730,6 +747,7 @@ public class procGen : MonoBehaviour
             return;
         }
         cell.obj = Instantiate(cell.obj);
+        cell.obj.layer = 0;
         cell.obj.GetComponent<Transform>().position = cell.pos + new Vector3(0, 0.05f, 0);
         cell.obj.transform.parent = this.transform;
         cell.rot *= UnityEngine.Random.Range(0, 4);
@@ -820,5 +838,13 @@ public class procGen : MonoBehaviour
         occupyCells(cell, 5);
         fiveNum--;
         
+    }
+    
+    public void ResetCellValues()
+    {
+        foreach (var cell in cells)
+        {
+            cell.value = -1;
+        }
     }
 }
